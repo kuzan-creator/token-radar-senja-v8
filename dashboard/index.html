@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Token Radar Senja v8 — evidence-first launch-value board</title>
+<link rel="stylesheet" href="app.css">
+</head>
+<body>
+<header class="masthead">
+  <div class="masthead-in">
+    <div>
+      <h1>Token Radar Senja <span class="v8">v8</span></h1>
+      <p class="sub">Which pre-token protocol is worth farming next — and what exactly to do about it.</p>
+    </div>
+    <div class="mast-side">
+      <div class="asof">Snapshot <b id="asOf">—</b></div>
+      <div class="asof">Source <span id="srcLine">—</span></div>
+    </div>
+  </div>
+</header>
+
+<main>
+  <!-- (f) Census first: the whole 758, with a reason per group. -->
+  <section class="card" id="censusCard">
+    <h2>The ledger: all 758 protocols, accounted for</h2>
+    <div class="censusbar" id="censusBar"></div>
+    <div class="censuslist" id="censusList"></div>
+  </section>
+
+  <!-- (a) Integrity strip: recomputed in the browser from board.json. -->
+  <section class="strip" id="integrityStrip">
+    <h2>Integrity — recomputed here, in your browser, from board.json</h2>
+    <div class="checks" id="integrityChecks"><span class="check pending">checking…</span></div>
+    <p class="fine">main.ts sha256: <code id="mainChecksum">—</code> · The board's own program is the checksum; the checks above re-derive the board from its file.</p>
+  </section>
+
+  <!-- The board: 15 columns. -->
+  <section class="card" id="boardCard">
+    <div class="boardhead">
+      <h2>The board — <span id="rowCount">…</span> pre-token protocols by implied launch value</h2>
+      <div class="filters">
+        <input type="search" id="q" placeholder="Search name or slug…" aria-label="Search">
+        <select id="catFilter" aria-label="Category"><option value="">All categories</option></select>
+        <select id="verdictFilter" aria-label="Verdict"><option value="">All verdicts</option><option>FARM</option><option>MARGINAL</option><option>SKIP</option></select>
+        <label class="wl"><input type="checkbox" id="wlOnly"> Watchlist only</label>
+      </div>
+    </div>
+    <p class="fine" id="filterNote"></p>
+    <div class="tablewrap">
+      <table id="board">
+        <thead><tr>
+          <th data-k="rank">#</th><th data-k="name">Protocol</th><th data-k="category">Category</th><th data-k="chains">Chains</th>
+          <th data-k="tvl_usd" class="num">TVL</th><th data-k="change_7d" class="num">7d</th><th data-k="age_years" class="num">Age</th>
+          <th data-k="fitted_usd" class="num">Fitted</th><th data-k="odds" class="num">Odds</th><th data-k="implied_value_usd" class="num">Implied</th>
+          <th class="num">Band</th><th data-k="verdict">Verdict</th><th data-k="net_usd" class="num">Net $</th>
+          <th data-k="net_per_hour_usd" class="num">Net $/h</th><th data-k="min_deposit_usd" class="num">Min dep</th>
+        </tr></thead>
+        <tbody id="boardBody"></tbody>
+      </table>
+    </div>
+    <p class="fine" id="bandNote">Click a row for its detail view and inline farm plan. Sort by clicking a column header. Implied = fitted mcap × token odds; the band is the fitted value × [0.427, 2.724] (leave-one-out P25–P75) × odds. Verdict, Net and Min dep are at each row's own ladder deposit (minimum viable capital); move a scenario slider to re-price the whole board at another deposit.</p>
+  </section>
+
+  <!-- (d) Live scenario controls: they re-price the whole board. -->
+  <section class="card controls" id="controlsCard">
+    <h2>Farm scenario — move a slider, the whole board re-prices</h2>
+    <div class="sliders">
+      <label>Deposit <b id="depVal">$1,500</b><input type="range" id="depSlider" min="500" max="25000" step="500" value="1500"></label>
+      <label>Drop share <b id="dropVal">7%</b><input type="range" id="dropSlider" min="2" max="15" step="0.5" value="7"></label>
+      <label>Horizon <b id="horVal">12 weeks</b><input type="range" id="horSlider" min="4" max="26" step="1" value="12"></label>
+      <label>TVL actively farmed <b id="partVal">5%</b><input type="range" id="partSlider" min="1" max="20" step="1" value="5"></label>
+    </div>
+    <p class="fine">Net = implied × drop share × (deposit ÷ (participation × TVL)) − $45 fees − capital charge (2% APR on the deposit over the horizon). FARM needs the band-low net to clear $150; MARGINAL needs the expected net above $0. Hours = 2 setup + 1 per week. <span id="scenarioNote"></span></p>
+  </section>
+
+  <!-- (g) KPI strip: evidence, not labels. -->
+  <section class="card" id="kpiCard">
+    <h2>What the model actually does — with the baseline beside every number</h2>
+    <div class="kpis" id="kpiStrip"></div>
+  </section>
+
+  <!-- Detail view (inline farm plan per row). -->
+  <section class="card hidden" id="detailCard">
+    <div class="detailhead"><h2 id="detailTitle">Protocol detail</h2><button id="detailClose" type="button">Close ✕</button></div>
+    <div id="detailBody"></div>
+  </section>
+
+  <!-- Farm-next strip. -->
+  <section class="card" id="farmNextCard">
+    <h2>Farm next — the best dollars per hour at the default scenario</h2>
+    <ol class="farmnext" id="farmNext"></ol>
+  </section>
+
+  <!-- (b) Three ablation tables side by side, losers included. -->
+  <section class="card" id="ablationCard">
+    <h2>What was tried — and what lost</h2>
+    <p class="fine">A candidate replaces the kept model only by winning <b>all three</b> tests (leave-one-out + two walk-forward cuts). The gate is the same for every row below; the notes say why each loser lost.</p>
+    <div class="ablations">
+      <div><h3>Value model — miss (×, lower is better)</h3><table class="abl" id="ablValue"></table></div>
+      <div><h3>Token odds — Brier (lower is better)</h3><table class="abl" id="ablOdds"></table></div>
+      <div><h3>Range honesty — coverage (target 50% / 80%)</h3><table class="abl" id="ablRange"></table></div>
+    </div>
+  </section>
+
+  <!-- (c) Bootstrap standard errors + model formulas. -->
+  <section class="card" id="modelCard">
+    <h2>The models, with their uncertainty</h2>
+    <div id="modelBody"></div>
+  </section>
+
+  <!-- (e) Scatter: cap on TVL. -->
+  <section class="card" id="scatterCard">
+    <h2>Cap on TVL — the 94 priced comps and the fitted curve</h2>
+    <div id="scatter"></div>
+    <p class="fine" id="scatterNote">Each dot is a protocol whose token already trades (log market cap against log TVL). The line is the fitted curve for the reference category; the band is the leave-one-out P25–P75. The two largest board rows sit inside the comps' TVL range — their fitted values are interpolations, not extrapolations.</p>
+  </section>
+
+  <!-- (h) Honest weakness + method. -->
+  <section class="card" id="weakCard">
+    <h2>What is wrong with this board</h2>
+    <p id="weakText"></p>
+    <h2>Method, in full</h2>
+    <p id="methodText"></p>
+  </section>
+</main>
+
+<footer>
+  <p>Token Radar Senja v8 · Built from the sealed DefiLlama snapshot of 2026-11-14. Implied values are this entry's own claims, never make.fun's. <span id="footChecksum"></span></p>
+</footer>
+
+<script src="evidence.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
